@@ -41,8 +41,7 @@ func (o *Options) maxConns() int {
 
 func (o *Options) options(addr string) *redis.Options {
 	return &redis.Options{
-		Addr:    addr,
-		Network: "tcp",
+		Addr: addr,
 
 		Password: o.Password,
 		PoolSize: o.PoolSize,

@@ -35,12 +35,12 @@ var _ = Describe("Client", func() {
 		subject.conns.Fetch("127.0.0.1:7003", subject.connectTo)
 		Expect(subject.slots).To(HaveLen(HashSlots))
 		Expect(subject.slots[0]).To(HaveLen(2))
-		Expect(subject.conns.Len()).To(Equal(1))
+		Expect(subject.conns.len()).To(Equal(1))
 
 		subject.reset()
 		Expect(subject.slots).To(HaveLen(HashSlots))
 		Expect(subject.slots[0]).To(BeEmpty())
-		Expect(subject.conns.Len()).To(Equal(0))
+		Expect(subject.conns.len()).To(Equal(0))
 	})
 
 	It("should populate slots cache", func() {
@@ -54,7 +54,7 @@ var _ = Describe("Client", func() {
 		Expect(subject.slots[12288]).To(Equal([]string{"127.0.0.1:7003", "127.0.0.1:7007"}))
 		Expect(subject.slots[16383]).To(Equal([]string{"127.0.0.1:7003", "127.0.0.1:7007"}))
 
-		Expect(subject.conns.Len()).To(Equal(0))
+		Expect(subject.conns.len()).To(Equal(0))
 
 		Expect(subject.addrs).To(ConsistOf([]string{
 			"127.0.0.1:6379",

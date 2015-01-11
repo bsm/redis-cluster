@@ -5,6 +5,7 @@ package cluster
 
 import (
 	"container/list"
+	"sync"
 
 	"gopkg.in/redis.v2"
 )
@@ -15,6 +16,8 @@ type connLRU struct {
 	maxEntries int
 	ll         *list.List
 	cache      map[string]*list.Element
+
+	sync.Mutex
 }
 
 type cachedConn struct {
@@ -30,12 +33,44 @@ func newLRU(maxEntries int) *connLRU {
 	}
 }
 
-// Add adds the provided addr and conn to the cache, evicting
+// Fetch gets or creates a new connection
+func (c *connLRU) Fetch(addr string, newConn func(string) *redis.Client) *redis.Client {
+	c.Lock()
+	conn, ok := c.get(addr)
+	c.Unlock()
+
+	if !ok {
+		conn = newConn(addr)
+		c.Lock()
+		c.add(addr, conn)
+		c.Unlock()
+	}
+	return conn
+}
+
+// Clear clears the cache
+func (c *connLRU) Clear() {
+	c.Lock()
+	defer c.Unlock()
+
+	for c.len() > 0 {
+		c.removeOldest()
+	}
+}
+
+// Len returns the number of items in the cache.
+func (c *connLRU) len() int {
+	return c.ll.Len()
+}
+
+// Adds the provided addr and conn to the cache, evicting
 // an old item if necessary.
-func (c *connLRU) Add(addr string, conn *redis.Client) {
+func (c *connLRU) add(addr string, conn *redis.Client) {
 	if ee, ok := c.cache[addr]; ok {
 		c.ll.MoveToFront(ee)
-		ee.Value.(*cachedConn).conn = conn
+		val := ee.Value.(*cachedConn)
+		val.conn.Close() // Close existing
+		val.conn = conn
 		return
 	}
 
@@ -43,24 +78,14 @@ func (c *connLRU) Add(addr string, conn *redis.Client) {
 	ele := c.ll.PushFront(&cachedConn{addr, conn})
 	c.cache[addr] = ele
 
-	if c.ll.Len() > c.maxEntries {
-		c.RemoveOldest()
+	if c.len() > c.maxEntries {
+		c.removeOldest()
 	}
 }
 
-// Fetch gets or creates a new connection
-func (c *connLRU) Fetch(addr string, newConn func(string) *redis.Client) *redis.Client {
-	conn, ok := c.Get(addr)
-	if !ok {
-		conn = newConn(addr)
-		c.Add(addr, conn)
-	}
-	return conn
-}
-
-// Get fetches the addr's conn from the cache.
+// Gets the addr's conn from the cache.
 // The ok result will be true if the item was found.
-func (c *connLRU) Get(addr string) (conn *redis.Client, ok bool) {
+func (c *connLRU) get(addr string) (conn *redis.Client, ok bool) {
 	if ele, hit := c.cache[addr]; hit {
 		c.ll.MoveToFront(ele)
 		return ele.Value.(*cachedConn).conn, true
@@ -68,9 +93,9 @@ func (c *connLRU) Get(addr string) (conn *redis.Client, ok bool) {
 	return
 }
 
-// RemoveOldest removes the oldest item in the cache.
+// Temoves the oldest item in the cache.
 // If the cache is empty, the empty string and nil are returned.
-func (c *connLRU) RemoveOldest() {
+func (c *connLRU) removeOldest() {
 	ele := c.ll.Back()
 	if ele == nil {
 		return
@@ -82,17 +107,4 @@ func (c *connLRU) RemoveOldest() {
 
 	// Close connection
 	ent.conn.Close()
-}
-
-// Clear clears the cache
-func (c *connLRU) Clear() {
-	size := c.Len()
-	for i := 0; i < size; i++ {
-		c.RemoveOldest()
-	}
-}
-
-// Len returns the number of items in the cache.
-func (c *connLRU) Len() int {
-	return c.ll.Len()
 }

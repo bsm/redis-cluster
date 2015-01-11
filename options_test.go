@@ -11,8 +11,7 @@ var _ = Describe("Options", func() {
 	It("should create redis options", func() {
 		opts := &Options{}
 		Expect(opts.options("127.0.0.1:7001")).To(Equal(&redis.Options{
-			Network: "tcp",
-			Addr:    "127.0.0.1:7001",
+			Addr: "127.0.0.1:7001",
 		}))
 	})
 

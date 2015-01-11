@@ -195,7 +195,7 @@ func (c *Client) clusterSlots(addr string) ([]slotInfo, error) {
 
 // Connect to an address
 func (c *Client) connectTo(addr string) *redis.Client {
-	return redis.NewClient(c.opts.options(addr))
+	return redis.NewTCPClient(c.opts.options(addr))
 }
 
 // Forces a cache reload on next request
